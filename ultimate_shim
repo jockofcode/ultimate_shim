@@ -5,31 +5,54 @@ shim_dir=$(dirname "$(readlink -f "$0")")
 shim_path="$(readlink -f "$0")"
 app_name=$(basename "$0")
 
-# Define help function
 function print_help() {
-	echo "This is a shim script for running various app commands with setup and environment configuration."
-	echo "Usage: $app_name [options] [arguments]"
-	echo ""
-	echo "The script first checks for a .{app_name}.env file in the current directory and sources it if found."
-	echo "Next, it checks for a .{app_name}.setup file or directory in the current directory."
-	echo "If a file is found, it's executed."
-	echo "If a directory is found, all files within that directory are executed."
-	echo "Finally, it runs the actual app command, excluding any setup or environment scripts."
-	echo ""
-	echo "If you ever want to skip the shim temporarily, just set an environment variable"
-	echo "NO_$(echo $app_name | tr '[:lower:]' '[:upper:]')_SHIM to a truthy value"
-	echo "Options:"
-	echo "  -h, -?, --help       Display this help message."
-	echo ""
-eecho "Below is the results of passing $arg to $app_name"
+  echo "This is a shim script for running various app commands with setup and environment configuration."
+  echo "Usage: $app_name [options] [arguments]"
+  echo 
+  echo "The script first checks for a .$app_name.env file in the current directory and sources it if found."
+  echo "Next, it checks for a .$app_name.setup file or directory in the current directory."
+  echo "If a file is found, it's executed."
+  echo "If a directory is found, all files within that directory are executed."
+  echo "Finally, it runs the actual app command, excluding any setup or environment scripts."
+  echo 
+  echo "If you ever want to skip the shim temporarily, just set an environment variable"
+  echo "NO_$(echo $app_name | tr '[:lower:]' '[:upper:]')_SHIM to a truthy value"
+  echo "Options:"
+  echo "  -h, -?, --help       Display this help message."
+  echo 
+  echo "Below is the results of passing $arg to $app_name"
 }
 
-# Handle help arguments
 for arg in "$@"; do
-	if [ "$arg" = "-h" ] || [ "$arg" = "-?" ] || [ "$arg" = "--help" ]; then
-		print_help
-	fi
+  if [ "$arg" = "-h" ] || [ "$arg" = "-?" ] || [ "$arg" = "--help" ]; then
+    print_help
+    exit 0
+  fi
 done
+
+if [ "$app_name" = "ultimate_shim" ]; then
+  if [ "$1" = "install" ]; then
+    if [ -n "$2" ]; then
+      ln -s "$shim_path" "$2"
+      chmod +x "$2"
+      echo "A softlink named '$2' pointing to ultimate_shim has been created."
+      echo "Ensure that '$2' is in a directory at the head of the \$PATH so it gets called instead of the application that's being shimmed."
+      echo "Next, create a .${2}.setup script in the directory where you will run the ${2} command."
+      echo "This .${2}.setup script should contain any setup commands that need to be run before ${2} (e.g., checking if a server is running, setting up a virtual environment)."
+      echo "Also, create a .${2}.env file in the directory where you will run the ${2} command, and set any environment variables needed by ${2}."
+    else
+      echo "You must specify a path/filename for the softlink to ultimate_shim."
+    fi
+  else
+    echo "The ultimate_shim script creates a shim for another application, allowing setup commands and environment variables to be set before running the application."
+    echo "To install, run ultimate_shim with the 'install' argument followed by a path/filename for the softlink to ultimate_shim."
+    echo "For example: 'ultimate_shim install /usr/local/bin/rails' creates a shim for Rails."
+    echo "Once installed, create a .<app_name>.setup script and a .<app_name>.env file in the directory where you will run the shimmed command."
+    echo "The .setup script should contain any setup commands that need to be run before the shimmed command, and the .env file should set any environment variables needed by the command."
+    print_help
+  fi
+  exit 0
+fi
 
 original_path="$PATH"
 current_dir=$(pwd)
@@ -39,10 +62,10 @@ actual_app_path=$(
 modified_path=""
 IFS=":"
 for path in $original_path; do
-	resolved_path=$(readlink -f "$path" 2>/dev/null || echo "$path")
-	if [ "$resolved_path" != "$shim_dir" ]; then
-		modified_path="${modified_path}${path}:"
-	fi
+  resolved_path=$(readlink -f "$path" 2>/dev/null || echo "$path")
+  if [ "$resolved_path" != "$shim_dir" ]; then
+    modified_path="${modified_path}${path}:"
+  fi
 done
 export PATH="${modified_path%:}"
 command -v "$app_name"
@@ -54,62 +77,62 @@ export actual_app_path="$actual_app_path"
 NO_SHIM_VAR="NO_$(echo ${app_name} | tr '[:lower:]' '[:upper:]')_SHIM"
 
 if [ "${!NO_SHIM_VAR}" != "true" ]; then
-# Check if .{app_name}.env exists in the current directory and source it if it does
-if [ -f ${current_dir}/.${app_name}.env ]; then
-	echo "Sourcing .${app_name}.env..."
-	source ${current_dir}/.${app_name}.env
-else
-	echo "No .${app_name}.env file found in the current directory"
-fi
+  # Check if .{app_name}.env exists in the current directory and source it if it does
+  if [ -f ${current_dir}/.${app_name}.env ]; then
+    echo "Sourcing .${app_name}.env..."
+    source ${current_dir}/.${app_name}.env
+  else
+    echo "No .${app_name}.env file found in the current directory"
+  fi
 
 # Check if .{app_name}.setup exists in the current directory and run it if it does
 setup_error=0
 if [ -d ${current_dir}/.${app_name}.setup ]; then
-	for file in ${current_dir}/.${app_name}.setup/*; do
-		if [ ! -x "$file" ]; then
-			echo "Setting $file as executable..."
-			chmod +x "$file"
-		fi
-		echo "Running $file..."
-		$file "$@"
-		setup_exit_code=$?
-		if [ $setup_exit_code -ne 0 ]; then
-			echo "$file returned an error."
-			setup_error=1
-		fi
+  for file in ${current_dir}/.${app_name}.setup/*; do
+    if [ ! -x "$file" ]; then
+      echo "Setting $file as executable..."
+      chmod +x "$file"
+    fi
+    echo "Running $file..."
+    $file "$@"
+    setup_exit_code=$?
+    if [ $setup_exit_code -ne 0 ]; then
+      echo "$file returned an error."
+      setup_error=1
+    fi
 
 
-	done
+  done
 elif [ -f ${current_dir}/.${app_name}.setup ]; then
-	if [ ! -x ${current_dir}/.${app_name}.setup ]; then
-		echo "Setting .${app_name}.setup as executable..."
-		chmod +x ${current_dir}/.${app_name}.setup
-	fi
-	echo "Running .${app_name}.setup..."
-	${current_dir}/.${app_name}.setup "$@"
-	setup_exit_code=$?
-	if [ $setup_exit_code -ne 0 ]; then
-		setup_error=1
-	fi
+  if [ ! -x ${current_dir}/.${app_name}.setup ]; then
+    echo "Setting .${app_name}.setup as executable..."
+    chmod +x ${current_dir}/.${app_name}.setup
+  fi
+  echo "Running .${app_name}.setup..."
+  ${current_dir}/.${app_name}.setup "$@"
+  setup_exit_code=$?
+  if [ $setup_exit_code -ne 0 ]; then
+    setup_error=1
+  fi
 else
-	echo "No .${app_name}.setup file or directory found in the current directory"
+  echo "No .${app_name}.setup file or directory found in the current directory"
 fi
 
 
 if [ $setup_error -ne 0 ]; then
-	echo ".${app_name}.setup returned an error. Exiting without running ${app_name}."
-	exit 1
+  echo ".${app_name}.setup returned an error. Exiting without running ${app_name}."
+  exit 1
 fi
 fi
 if [ -n "$actual_app_path" ]; then
-	if [ "$actual_app_path" != "$shim_path" ]; then
-		echo "Executing $actual_app_path with arguments $@"
-		exec "$actual_app_path" "$@"
-	else
-		echo "Error: found the shim instead of the original '${app_name}' executable."
-		exit 1
-	fi
+  if [ "$actual_app_path" != "$shim_path" ]; then
+    echo "Executing $actual_app_path with arguments $@"
+    exec "$actual_app_path" "$@"
+  else
+    echo "Error: found the shim instead of the original '${app_name}' executable."
+    exit 1
+  fi
 else
-	echo "Error: could not find the original '${app_name}' executable."
-	exit 1
+  echo "Error: could not find the original '${app_name}' executable."
+  exit 1
 fi
