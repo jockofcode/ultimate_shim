@@ -1,6 +1,6 @@
 # Ultimate Shim 
 
-This repository contains a bash script that serves as a "shim" for running various application commands with setup and environment configurations.
+This repository contains a bash script that serves as a "shim" for running various application commands with setup and environment configurations applied before it is run.
 
 ## Description
 
@@ -149,9 +149,7 @@ This will start the Rails server with the `PORT` environment variable set to 900
 
 ## Errors
 
-In case of any error during the setup phase (if the `.setup` file or any file within the `.setup` directory returns a non-zero exit code), the script will exit without running the actual app command if the first argument is 'c' or 's'. However, for any other argument, the script will still run the actual app command, despite the setup error.
-
-This c or s exception will go away on the next version
+In case of any error during the setup phase (if the `.setup` file or any file within the `.setup` directory returns a non-zero exit code), the script will exit without running the actual app command.
 
 ## Notes
 

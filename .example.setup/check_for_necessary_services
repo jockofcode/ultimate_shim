@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Array of services and their corresponding port numbers
+services_ports=(
+    "postgresql:5432"
+    "redis:6379"
+    "mysql:3306"
+    "rabbitmq:5672"
+)
+
+# Initialize the status
+status=0
+
+# Check each service
+for service_port in "${services_ports[@]}"
+do
+    service=${service_port%%:*} # Extract service
+    port=${service_port##*:}    # Extract port
+
+    is_service_running $port $service
+    if [[ $? -ne 0 ]]; then
+        status=1
+    fi
+done
+
+exit $status
+
