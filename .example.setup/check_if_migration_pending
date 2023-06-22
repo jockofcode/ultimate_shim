@@ -1,0 +1,14 @@
+#!/bin/bash
+
+
+# Check if there are pending migrations
+migrations=$($actual_app_path db:migrate:status | grep 'down')
+if [ -n "$migrations" ]
+then
+    echo "There are pending migrations. Please run them and try again."
+    exit 1
+else
+    echo "No pending migrations."
+    exit 0
+fi
+
