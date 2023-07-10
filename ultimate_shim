@@ -5,6 +5,34 @@ shim_dir=$(dirname "$(readlink -f "$0")")
 shim_path="$(readlink -f "$0")"
 app_name=$(basename "$0")
 
+function run_app_or_script() {
+  local app_name=$1
+  shift
+  local first_arg=$1
+  shift
+
+  # Look for a script named 'appname-arg1' in the $PATH
+  local script_path=$(command -v "${app_name}-${first_arg}" 2>/dev/null)
+
+  if [ -n "$script_path" ] && [ -x "$script_path" ]; then
+    # If the script is found and it's executable, run it with the remaining arguments
+    echo "Executing $script_path with arguments $@"
+    exec "$script_path" "$@"
+  elif [ -n "$actual_app_path" ]; then
+    # If the script is not found, execute the actual app
+    if [ "$actual_app_path" != "$shim_path" ]; then
+      echo "Executing $actual_app_path with arguments $first_arg $@"
+      exec "$actual_app_path" "$first_arg" "$@"
+    else
+      echo "Error: found the shim instead of the original '${app_name}' executable."
+      exit 1
+    fi
+  else
+    echo "Error: could not find the original '${app_name}' executable."
+    exit 1
+  fi
+}
+
 function print_help() {
   echo "This is a shim script for running various app commands with setup and environment configuration."
   echo "Usage: $app_name [options] [arguments]"
@@ -85,54 +113,56 @@ if [ "${!NO_SHIM_VAR}" != "true" ]; then
     echo "No .${app_name}.env file found in the current directory"
   fi
 
-# Check if .{app_name}.setup exists in the current directory and run it if it does
-setup_error=0
-if [ -d ${current_dir}/.${app_name}.setup ]; then
-  for file in ${current_dir}/.${app_name}.setup/*; do
-    if [ ! -x "$file" ]; then
-      echo "Setting $file as executable..."
-      chmod +x "$file"
+  setup_error=0 # Check if .{app_name}.setup exists in the current directory and run it if it does
+  if [ -d ${current_dir}/.${app_name}.setup ]; then
+    for file in ${current_dir}/.${app_name}.setup/*; do
+      if [ ! -x "$file" ]; then
+        echo "Setting $file as executable..."
+        chmod +x "$file"
+      fi
+      #    echo "Running $file..."
+      $file "$@"
+      setup_exit_code=$?
+      if [ $setup_exit_code -ne 0 ]; then
+        echo "$file returned an error."
+        setup_error=1
+      fi
+    done
+  elif [ -f ${current_dir}/.${app_name}.setup ]; then
+    if [ ! -x ${current_dir}/.${app_name}.setup ]; then
+      echo "Setting .${app_name}.setup as executable..."
+      chmod +x ${current_dir}/.${app_name}.setup
     fi
-    echo "Running $file..."
-    $file "$@"
+    #  echo "Running .${app_name}.setup..."
+    ${current_dir}/.${app_name}.setup "$@"
     setup_exit_code=$?
     if [ $setup_exit_code -ne 0 ]; then
-      echo "$file returned an error."
       setup_error=1
     fi
-
-
-  done
-elif [ -f ${current_dir}/.${app_name}.setup ]; then
-  if [ ! -x ${current_dir}/.${app_name}.setup ]; then
-    echo "Setting .${app_name}.setup as executable..."
-    chmod +x ${current_dir}/.${app_name}.setup
-  fi
-  echo "Running .${app_name}.setup..."
-  ${current_dir}/.${app_name}.setup "$@"
-  setup_exit_code=$?
-  if [ $setup_exit_code -ne 0 ]; then
-    setup_error=1
-  fi
-else
-  echo "No .${app_name}.setup file or directory found in the current directory"
-fi
-
-
-if [ $setup_error -ne 0 ]; then
-  echo ".${app_name}.setup returned an error. Exiting without running ${app_name}."
-  exit 1
-fi
-fi
-if [ -n "$actual_app_path" ]; then
-  if [ "$actual_app_path" != "$shim_path" ]; then
-    echo "Executing $actual_app_path with arguments $@"
-    exec "$actual_app_path" "$@"
   else
-    echo "Error: found the shim instead of the original '${app_name}' executable."
+    echo "No .${app_name}.setup file or directory found in the current directory"
+  fi
+
+  if [ $setup_error -ne 0 ]; then
+    echo ".${app_name}.setup returned an error. Exiting without running ${app_name}."
     exit 1
   fi
+fi
+
+# Run the actual app or a script named 'appname-arg1' if it exists and if arguments were passed
+if [ $# -gt 0 ]; then
+  run_app_or_script "$app_name" "$@"
 else
-  echo "Error: could not find the original '${app_name}' executable."
-  exit 1
+  if [ -n "$actual_app_path" ]; then
+    if [ "$actual_app_path" != "$shim_path" ]; then
+      echo "Executing $actual_app_path with no arguments"
+      exec "$actual_app_path"
+    else
+      echo "Error: found the shim instead of the original '${app_name}' executable."
+      exit 1
+    fi
+  else
+    echo "Error: could not find the original '${app_name}' executable."
+    exit 1
+  fi
 fi

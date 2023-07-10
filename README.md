@@ -2,17 +2,6 @@
 
 This repository contains a bash script that serves as a "shim" for running various application commands with setup and environment configurations applied before it is run.
 
-## Description
-
-The script works as follows:
-
-1. First, it checks for a `.app_name.env` file for the application in the current directory and sources it if found.
-2. Next, it checks for a `.app_name.setup` file or directory for the application in the current directory. If a file is found, it's executed. If a directory is found, all files within that directory are executed.
-3. If any of the `setup` scripts return an error code, the shim stops executing and doesn't run the actual application
-4. Finally, it runs the actual application command
-
-The script also provides an option to temporarily skip the shim by setting an environment variable `NO_{APP_NAME}_SHIM` to a truthy value. 
-
 ## Naming and Softlinking the Shim
 
 In order to successfully use the shim script, you need to either name the shim script the same name as the application being shimmed, or create a softlink with the application's name that points to the shim script.
@@ -34,6 +23,18 @@ ln -s /path/to/shim_script.sh /path/to/my_app
 ```
 
 Make sure to replace `/path/to/shim_script.sh` with the actual path to your shim script, and `/path/to/my_app` with where you want the softlink to reside.
+
+## Description
+
+The script works as follows:
+
+1. First, it checks for a `.app_name.env` file for the application in the current directory and sources it if found.
+1. Next, it checks for a `.app_name.setup` file or directory for the application in the current directory. If a file is found, it's executed. If a directory is found, all files within that directory are executed.
+1. If any of the `setup` scripts return an error code, the shim stops executing and doesn't run the actual application
+1. If there is a script named `app_name-argname`, and you call app-name with argname as the first argument, it will run the script `app_name-argname` instead, similar to `git`
+1. Finally, it runs the actual application command if there isn't a substitute script
+
+The script also provides an option to temporarily skip the shim by setting an environment variable `NO_{APP_NAME}_SHIM` to a truthy value. 
 
 ### Path Considerations
 
